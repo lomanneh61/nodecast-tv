@@ -295,17 +295,19 @@ router.get('/stream', async (req, res) => {
         // Check if it's an HLS manifest by looking at first bytes (#EXTM3U = 23 45 58 54 4D 33 55)
         const textPrefix = String.fromCharCode(...bytes.slice(0, 7));
         const contentLooksLikeHls = textPrefix === '#EXTM3U';
-        const urlLooksLikeHls = contentType.includes('mpegurl') || contentType.includes('application/x-mpegURL') || url.toLowerCase().includes('.m3u8');
 
         if (contentLooksLikeHls) {
-            console.log(`[Proxy] Processing HLS manifest from: ${url.substring(0, 80)}...`);
+            // Use the final URL after redirects for base URL calculation
+            // This is critical for Xtream CDNs that redirect to different servers
+            const finalUrl = response.url || url;
+            console.log(`[Proxy] Processing HLS manifest from: ${finalUrl.substring(0, 80)}...`);
             res.set('Content-Type', 'application/vnd.apple.mpegurl');
 
             let manifest = Buffer.from(buffer).toString('utf-8');
             // Rewrite URLs inside manifest
 
-            const urlObj = new URL(url);
-            const baseUrl = urlObj.origin + urlObj.pathname.substring(0, urlObj.pathname.lastIndexOf('/') + 1);
+            const finalUrlObj = new URL(finalUrl);
+            const baseUrl = finalUrlObj.origin + finalUrlObj.pathname.substring(0, finalUrlObj.pathname.lastIndexOf('/') + 1);
             console.log(`[Proxy] Base URL for rewriting: ${baseUrl}`);
 
             manifest = manifest.split('\n').map(line => {

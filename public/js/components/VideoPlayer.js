@@ -32,7 +32,8 @@ class VideoPlayer {
             defaultVolume: 80, // 0-100
             rememberVolume: true, // Persist volume between sessions
             lastVolume: 80, // Last used volume (if rememberVolume is true)
-            autoPlayNextEpisode: false // Auto-play next episode in series
+            autoPlayNextEpisode: false, // Auto-play next episode in series
+            forceProxy: false // Force all streams through backend proxy
         };
         try {
             const saved = localStorage.getItem('nodecast_tv_player_settings');
@@ -201,10 +202,12 @@ class VideoPlayer {
             // Determine if HLS or direct stream
             this.currentUrl = streamUrl;
 
-            // Proactively use proxy for known CORS-restricted domains (like Pluto TV)
+            // Proactively use proxy for:
+            // 1. User enabled "Force Proxy" in settings
+            // 2. Known CORS-restricted domains (like Pluto TV)
             // Note: Xtream sources are NOT auto-proxied because many providers IP-lock streams
             const proxyRequiredDomains = ['pluto.tv'];
-            const needsProxy = proxyRequiredDomains.some(domain => streamUrl.includes(domain));
+            const needsProxy = this.settings.forceProxy || proxyRequiredDomains.some(domain => streamUrl.includes(domain));
 
             this.isUsingProxy = needsProxy;
             const finalUrl = needsProxy ? this.getProxiedUrl(streamUrl) : streamUrl;

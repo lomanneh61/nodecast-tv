@@ -28,6 +28,7 @@ class SettingsPage {
         const volumeValueDisplay = document.getElementById('volume-value');
         const rememberVolumeToggle = document.getElementById('setting-remember-volume');
         const autoPlayNextToggle = document.getElementById('setting-autoplay-next');
+        const forceProxyToggle = document.getElementById('setting-force-proxy');
 
         // Load current settings
         if (this.app.player?.settings) {
@@ -37,6 +38,9 @@ class SettingsPage {
             volumeValueDisplay.textContent = this.app.player.settings.defaultVolume + '%';
             rememberVolumeToggle.checked = this.app.player.settings.rememberVolume;
             autoPlayNextToggle.checked = this.app.player.settings.autoPlayNextEpisode;
+            if (forceProxyToggle) {
+                forceProxyToggle.checked = this.app.player.settings.forceProxy || false;
+            }
         }
 
         // Arrow keys toggle
@@ -70,6 +74,12 @@ class SettingsPage {
         // Auto-play next episode toggle
         autoPlayNextToggle?.addEventListener('change', () => {
             this.app.player.settings.autoPlayNextEpisode = autoPlayNextToggle.checked;
+            this.app.player.saveSettings();
+        });
+
+        // Force proxy toggle
+        forceProxyToggle?.addEventListener('change', () => {
+            this.app.player.settings.forceProxy = forceProxyToggle.checked;
             this.app.player.saveSettings();
         });
 
