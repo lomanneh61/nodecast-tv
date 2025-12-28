@@ -14,7 +14,7 @@ router.get('/hidden', (req, res) => {
     }
 });
 
-// Hide a channel or group
+// Hide a channel, group, or category
 router.post('/hide', (req, res) => {
     try {
         const { sourceId, itemType, itemId } = req.body;
@@ -23,8 +23,9 @@ router.post('/hide', (req, res) => {
             return res.status(400).json({ error: 'sourceId, itemType, and itemId are required' });
         }
 
-        if (!['channel', 'group'].includes(itemType)) {
-            return res.status(400).json({ error: 'itemType must be "channel" or "group"' });
+        const validTypes = ['channel', 'group', 'vod_category', 'series_category'];
+        if (!validTypes.includes(itemType)) {
+            return res.status(400).json({ error: `itemType must be one of: ${validTypes.join(', ')}` });
         }
 
         hiddenItems.hide(sourceId, itemType, itemId);
