@@ -202,6 +202,7 @@ class VideoPlayer {
             this.currentUrl = streamUrl;
 
             // Proactively use proxy for known CORS-restricted domains (like Pluto TV)
+            // Note: Xtream sources are NOT auto-proxied because many providers IP-lock streams
             const proxyRequiredDomains = ['pluto.tv'];
             const needsProxy = proxyRequiredDomains.some(domain => streamUrl.includes(domain));
 
@@ -221,11 +222,18 @@ class VideoPlayer {
                 // Re-attach error handler for the new Hls instance
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
                     if (data.fatal) {
-                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !this.isUsingProxy) {
-                            console.log('CORS/Network error detected, retrying via proxy...');
+                        // CORS issues can manifest as NETWORK_ERROR or MEDIA_ERROR with fragParsingError
+                        const isCorsLikely = data.type === Hls.ErrorTypes.NETWORK_ERROR ||
+                            (data.type === Hls.ErrorTypes.MEDIA_ERROR && data.details === 'fragParsingError');
+
+                        if (isCorsLikely && !this.isUsingProxy) {
+                            console.log('CORS/Network error detected, retrying via proxy...', data.details);
                             this.isUsingProxy = true;
                             this.hls.loadSource(this.getProxiedUrl(this.currentUrl));
                             this.hls.startLoad();
+                        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                            console.log('Media error, attempting recovery...');
+                            this.hls.recoverMediaError();
                         } else {
                             console.error('Fatal HLS error:', data);
                         }

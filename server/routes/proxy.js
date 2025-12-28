@@ -276,54 +276,73 @@ router.get('/stream', async (req, res) => {
 
         const response = await fetch(url, { headers });
         if (!response.ok) {
-            console.error(`Upstream error for ${url}: ${response.status} ${response.statusText}`);
+            console.error(`Upstream error for ${url.substring(0, 80)}...: ${response.status} ${response.statusText}`);
+            // Log response body for debugging 403s
+            if (response.status === 403) {
+                const errorBody = await response.text().catch(() => 'N/A');
+                console.error(`403 Response body: ${errorBody.substring(0, 200)}`);
+            }
             return res.status(response.status).send(`Failed to fetch stream: ${response.statusText}`);
         }
 
         const contentType = response.headers.get('content-type') || '';
         res.set('Access-Control-Allow-Origin', '*');
 
-        // Check if it's an HLS manifest
-        const isHls = contentType.includes('mpegurl') || contentType.includes('application/x-mpegURL') || url.toLowerCase().includes('.m3u8');
+        // Read response as array buffer
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
 
-        if (isHls) {
-            let manifest = await response.text();
+        // Check if it's an HLS manifest by looking at first bytes (#EXTM3U = 23 45 58 54 4D 33 55)
+        const textPrefix = String.fromCharCode(...bytes.slice(0, 7));
+        const contentLooksLikeHls = textPrefix === '#EXTM3U';
+        const urlLooksLikeHls = contentType.includes('mpegurl') || contentType.includes('application/x-mpegURL') || url.toLowerCase().includes('.m3u8');
 
+        if (contentLooksLikeHls) {
+            console.log(`[Proxy] Processing HLS manifest from: ${url.substring(0, 80)}...`);
+            res.set('Content-Type', 'application/vnd.apple.mpegurl');
+
+            let manifest = Buffer.from(buffer).toString('utf-8');
             // Rewrite URLs inside manifest
-            if (manifest.trim().startsWith('#EXTM3U')) {
-                res.set('Content-Type', 'application/vnd.apple.mpegurl');
 
-                const urlObj = new URL(url);
-                const baseUrl = urlObj.origin + urlObj.pathname.substring(0, urlObj.pathname.lastIndexOf('/') + 1);
+            const urlObj = new URL(url);
+            const baseUrl = urlObj.origin + urlObj.pathname.substring(0, urlObj.pathname.lastIndexOf('/') + 1);
+            console.log(`[Proxy] Base URL for rewriting: ${baseUrl}`);
 
-                manifest = manifest.split('\n').map(line => {
-                    const trimmed = line.trim();
-                    if (trimmed === '' || trimmed.startsWith('#')) {
-                        if (trimmed.includes('URI="')) {
-                            return line.replace(/URI="([^"]+)"/g, (match, p1) => {
-                                try {
-                                    const absoluteUrl = new URL(p1, baseUrl).href;
-                                    return `URI="${req.protocol}://${req.get('host')}${req.baseUrl}/stream?url=${encodeURIComponent(absoluteUrl)}"`;
-                                } catch (e) { return match; }
-                            });
-                        }
-                        return line;
+            manifest = manifest.split('\n').map(line => {
+                const trimmed = line.trim();
+                if (trimmed === '' || trimmed.startsWith('#')) {
+                    if (trimmed.includes('URI="')) {
+                        return line.replace(/URI="([^"]+)"/g, (match, p1) => {
+                            try {
+                                const absoluteUrl = new URL(p1, baseUrl).href;
+                                return `URI="${req.protocol}://${req.get('host')}${req.baseUrl}/stream?url=${encodeURIComponent(absoluteUrl)}"`;
+                            } catch (e) { return match; }
+                        });
                     }
+                    return line;
+                }
 
-                    try {
-                        const absoluteUrl = new URL(trimmed, baseUrl).href;
-                        return `${req.protocol}://${req.get('host')}${req.baseUrl}/stream?url=${encodeURIComponent(absoluteUrl)}`;
-                    } catch (e) { return line; }
-                }).join('\n');
-            }
+                // Check if it's a URL (segment or playlist reference)
+                try {
+                    // Handle both relative and absolute URLs
+                    let absoluteUrl;
+                    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                        // Already an absolute URL
+                        absoluteUrl = trimmed;
+                    } else {
+                        // Relative URL - make it absolute
+                        absoluteUrl = new URL(trimmed, baseUrl).href;
+                    }
+                    return `${req.protocol}://${req.get('host')}${req.baseUrl}/stream?url=${encodeURIComponent(absoluteUrl)}`;
+                } catch (e) { return line; }
+            }).join('\n');
 
-            // Return manifest (whether rewritten or not)
+            // Return rewritten manifest
             return res.send(manifest);
         }
 
         // Binary content (segments)
-        res.set('Content-Type', contentType);
-        const buffer = await response.arrayBuffer();
+        res.set('Content-Type', contentType || 'application/octet-stream');
         return res.send(Buffer.from(buffer));
 
     } catch (err) {

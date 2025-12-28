@@ -168,12 +168,15 @@ async function fetchAndParse(url) {
     }
 
     let content;
-    const contentEncoding = response.headers.get('content-encoding');
-    const isGzipped = url.endsWith('.gz') || contentEncoding === 'gzip';
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
 
-    if (isGzipped) {
+    // Check for gzip magic bytes (1f 8b) to detect actual gzip content
+    // This handles cases where the server auto-decompresses or the URL doesn't reflect actual encoding
+    const isActuallyGzipped = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+
+    if (isActuallyGzipped) {
         // Handle gzipped EPG files (.xml.gz)
-        const buffer = await response.arrayBuffer();
         try {
             const decompressed = await gunzip(Buffer.from(buffer));
             content = decompressed.toString('utf-8');
@@ -181,7 +184,8 @@ async function fetchAndParse(url) {
             throw new Error(`Failed to decompress gzipped EPG: ${err.message}`);
         }
     } else {
-        content = await response.text();
+        // Already plain text (or auto-decompressed by fetch)
+        content = Buffer.from(buffer).toString('utf-8');
     }
 
     return parse(content);
