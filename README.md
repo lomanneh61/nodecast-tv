@@ -120,6 +120,24 @@ If you are using `acestream-docker-home` or similar tools, you **MUST** use the 
 -   **Don't use**: `http://proxy:6878/ace/getstream?id=...` (This is a raw MPEG-TS stream)
 -   **Do use**: `http://proxy:6878/ace/manifest.m3u8?id=...` (This wraps the stream in a browser-friendly HLS playlist)
 
+### TVHeadend
+
+If you're using TVHeadend as your source, you may need to configure a few settings for streams to play correctly in NodeCast TV:
+
+**Option 1: Enable Force Backend Proxy (Easiest)**
+- In NodeCast TV, go to **Settings → Player → Streaming**
+- Enable **"Force Backend Proxy"**
+- This routes streams through the server, bypassing browser CORS restrictions
+
+**Option 2: Configure TVHeadend CORS**
+- In TVHeadend, go to **Configuration → General → Base → HTTP Server Settings**
+- Add your NodeCast TV URL to **"CORS origin"** (e.g., `http://192.168.1.100:3000`)
+- **Note:** You must include the protocol (`http://` or `https://`)
+
+**Additional Tips:**
+- Enable **"digest+plain"** authentication in TVHeadend if using username/password in the M3U URL
+- Try different stream profiles (`?profile=pass` or `?profile=matroska`) if playback issues persist
+
 ## Technology Stack
 
 - **Backend**: Node.js, Express
