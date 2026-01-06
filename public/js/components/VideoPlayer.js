@@ -278,6 +278,25 @@ class VideoPlayer {
         // Initialize HLS.js if supported
         if (Hls.isSupported()) {
             this.hls = new Hls(this.getHlsConfig());
+            
+              // Memory guard: trim back buffer every 5 seconds 
+              setInterval(() => { 
+                  try { 
+                      const sb = this.video.buffered; 
+                      if (!sb || sb.length === 0) return; 
+              
+                      const current = this.video.currentTime; 
+                      const keepBehind = 10; // keep last 10 seconds 
+                      const removeEnd = current - keepBehind; 
+              
+                      if (removeEnd > 0) { 
+                          this.hls.bufferController.removeBufferRange(0, removeEnd); 
+                      } 
+                  } catch (e) { 
+                      console.warn('Buffer trim error:', e); 
+                  } 
+               }, 5000);
+        
             this.lastDiscontinuity = -1; // Track discontinuity changes
 
             this.hls.on(Hls.Events.ERROR, (event, data) => {
