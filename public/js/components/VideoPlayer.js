@@ -106,14 +106,14 @@ class VideoPlayer {
         return {
             enableWorker: true,
             // Buffer settings to prevent underruns during background tab throttling
-            maxBufferLength: 30,           // Buffer up to 30 seconds of content
-            maxMaxBufferLength: 60,        // Absolute max buffer 60 seconds
-            maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer size
+            maxBufferLength: 10,           // Buffer up to 30 seconds of content
+            maxMaxBufferLength: 20,        // Absolute max buffer 60 seconds
+            maxBufferSize: 20 * 1000 * 1000, // 60MB max buffer size
             maxBufferHole: 1.0,            // Allow 1s holes in buffer (helps with discontinuities)
             // Live stream settings - stay further from live edge for stability
             liveSyncDurationCount: 3,      // Stay 3 segments behind live
             liveMaxLatencyDurationCount: 10, // Allow up to 10 segments behind before catching up
-            liveBackBufferLength: 30,      // Keep 30s of back buffer for seeking
+            liveBackBufferLength: 5,      // Keep 30s of back buffer for seeking
             // Audio discontinuity handling (fixes garbled audio during ad transitions)
             stretchShortVideoTrack: true,  // Stretch short segments to avoid gaps
             forceKeyFrameOnDiscontinuity: true, // Force keyframe sync on discontinuity
